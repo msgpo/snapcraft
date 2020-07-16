@@ -72,7 +72,7 @@ def _resolve_snap_command_path(
     search_required = False
     command = _strip_command_leaders(command)
 
-    # If it is where it claims to be, search for backwards compatibility.
+    # If not where it claims to be, search for backwards compatibility.
     if not os.path.exists(os.path.join(prime_dir, command)):
         search_required = True
 
