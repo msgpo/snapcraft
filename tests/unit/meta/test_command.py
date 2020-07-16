@@ -96,6 +96,19 @@ def test_interpretered_command_from_prime(tmp_path):
     assert cmd.command == "bin/python3 $SNAP/foo bar -baz"
 
 
+def test_interpretered_command_from_root(tmp_path):
+    _create_file(os.path.join(tmp_path, "foo"), contents="#!/bin/sh\n")
+
+    cmd = command.Command(
+        app_name="foo", command_name="command", command="foo bar -baz"
+    )
+    cmd.prime_command(
+        can_use_wrapper=True, massage_command=True, prime_dir=tmp_path.as_posix(),
+    )
+
+    assert cmd.command == "foo bar -baz"
+
+
 class CommandWithoutWrapperAllowedTestErrors(unit.TestCase):
     def setUp(self):
         super().setUp()

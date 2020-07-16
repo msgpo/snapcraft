@@ -122,6 +122,11 @@ def _resolve_interpreter_parts(
     if resolved_parts[0] == "/usr/bin/env":
         resolved_parts = resolved_parts[1:]
 
+    # With exception of /usr/bin/env, if interpreter is absolute,
+    # ignore the interpreter by returning no interpreter parts.
+    if resolved_parts[0].startswith("/"):
+        return []
+
     resolved_interpreter, search_required = _resolve_snap_command_path(
         command=resolved_parts[0], prime_dir=prime_dir
     )
@@ -190,15 +195,13 @@ def _massage_command(*, command: str, prime_dir: str) -> str:
     )
 
     if shebang_parts:
-        interpreted_command = True
         shebang_parts = _resolve_interpreter_parts(
             shebang_parts=shebang_parts,
             command_parts=command_parts,
             prime_dir=prime_dir,
         )
-    else:
-        interpreted_command = False
 
+    interpreted_command = len(shebang_parts) > 0
     command_parts = _resolve_command_parts(
         command_parts=command_parts,
         interpreted_command=interpreted_command,
