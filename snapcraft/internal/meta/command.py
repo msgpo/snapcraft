@@ -54,13 +54,13 @@ def _find_executable(*, command: str, prime_dir: str) -> Optional[str]:
     for binary_path in binary_paths:
         if _executable_is_valid(binary_path):
             return binary_path
-    else:
-        # Last chance to find in the prime_dir, mostly for backwards compatibility,
-        # to find the executable, historical snaps like those built with the catkin
-        # plugin will have roslaunch in a path like /opt/ros/bin/roslaunch.
-        for root, _, files in os.walk(prime_dir):
-            if _executable_is_valid(os.path.join(root, command)):
-                return os.path.join(root, command)
+
+    # Last chance to find in the prime_dir, mostly for backwards compatibility,
+    # to find the executable, historical snaps like those built with the catkin
+    # plugin will have roslaunch in a path like /opt/ros/bin/roslaunch.
+    for root, _, files in os.walk(prime_dir):
+        if _executable_is_valid(os.path.join(root, command)):
+            return os.path.join(root, command)
 
     # Finally, check if it is part of the system.
     return shutil.which(command)
