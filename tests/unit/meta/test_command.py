@@ -129,7 +129,7 @@ class CommandWithoutWrapperAllowedTestErrors(unit.TestCase):
             self.fake_logger.output.strip(),
             Equals(
                 "The command 'sh' was not found in the prime directory, but found '/bin/sh'.\n"
-                "The command 'sh' has been changed to '/bin/sh'."
+                "The command 'sh' has been rewritten to '/bin/sh'."
             ),
         )
 
@@ -193,7 +193,7 @@ class CommandWithWrapperTest(unit.TestCase):
             self.fake_logger.output.strip(),
             Equals(
                 "Found unneeded '$SNAP/' in command '$SNAP/foo !option'.\n"
-                "The command '$SNAP/foo !option' has been changed to 'foo !option'.\n"
+                "The command '$SNAP/foo !option' has been rewritten to 'foo !option'.\n"
                 "A shell wrapper will be generated for command 'foo !option' "
                 "as it does not conform with the command pattern expected "
                 "by the runtime. Commands must be relative to the prime "
@@ -281,7 +281,7 @@ class CommandWithWrapperTest(unit.TestCase):
             self.fake_logger.output.strip(),
             Equals(
                 "The command 'sh' was not found in the prime directory, but found '/bin/sh'.\n"
-                "The command 'sh' has been changed to '/bin/sh'.\n"
+                "The command 'sh' has been rewritten to '/bin/sh'.\n"
                 "A shell wrapper will be generated for command '/bin/sh' "
                 "as it does not conform with the command pattern expected "
                 "by the runtime. Commands must be relative to the prime "

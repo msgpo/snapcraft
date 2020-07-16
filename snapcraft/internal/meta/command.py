@@ -220,7 +220,7 @@ def _massage_command(*, command: str, prime_dir: str) -> str:
             )
         else:
             logger.warning(
-                f"The command {command!r} has been changed to {massaged_command!r}."
+                f"The command {command!r} has been rewritten to {massaged_command!r}."
             )
 
     return massaged_command
