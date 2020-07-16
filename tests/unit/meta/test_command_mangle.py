@@ -53,7 +53,7 @@ class TestCommandMangle:
                 expected_command="foo bar",
                 expected_logs=[
                     "Found unneeded '$SNAP/' in command '$SNAP/foo bar'.",
-                    "The command '$SNAP/foo bar' has been rewritten to 'foo bar'.",
+                    "The command '$SNAP/foo bar' has been changed to 'foo bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -78,7 +78,7 @@ class TestCommandMangle:
                 expected_command="bin/foo bar",
                 expected_logs=[
                     "Found unneeded '$SNAP/' in command '$SNAP/bin/foo bar'.",
-                    "The command '$SNAP/bin/foo bar' has been rewritten to 'bin/foo bar'.",
+                    "The command '$SNAP/bin/foo bar' has been changed to 'bin/foo bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -92,7 +92,7 @@ class TestCommandMangle:
                 expected_command="bin/foo bar",
                 expected_logs=[
                     "The command 'foo' was not found in the prime directory, but found 'bin/foo'.",
-                    "The command 'foo bar' has been rewritten to 'bin/foo bar'.",
+                    "The command 'foo bar' has been changed to 'bin/foo bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -106,7 +106,7 @@ class TestCommandMangle:
                 expected_command="sbin/foo bar",
                 expected_logs=[
                     "The command 'foo' was not found in the prime directory, but found 'sbin/foo'.",
-                    "The command 'foo bar' has been rewritten to 'sbin/foo bar'.",
+                    "The command 'foo bar' has been changed to 'sbin/foo bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -120,7 +120,7 @@ class TestCommandMangle:
                 expected_command="usr/bin/foo bar",
                 expected_logs=[
                     "The command 'foo' was not found in the prime directory, but found 'usr/bin/foo'.",
-                    "The command 'foo bar' has been rewritten to 'usr/bin/foo bar'.",
+                    "The command 'foo bar' has been changed to 'usr/bin/foo bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -134,7 +134,7 @@ class TestCommandMangle:
                 expected_command="usr/sbin/foo bar",
                 expected_logs=[
                     "The command 'foo' was not found in the prime directory, but found 'usr/sbin/foo'.",
-                    "The command 'foo bar' has been rewritten to 'usr/sbin/foo bar'.",
+                    "The command 'foo bar' has been changed to 'usr/sbin/foo bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -148,7 +148,7 @@ class TestCommandMangle:
                 expected_command="/bin/sh bar",
                 expected_logs=[
                     "The command 'sh' was not found in the prime directory, but found '/bin/sh'.",
-                    "The command 'sh bar' has been rewritten to '/bin/sh bar'.",
+                    "The command 'sh bar' has been changed to '/bin/sh bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -162,7 +162,7 @@ class TestCommandMangle:
                 expected_command="bar/foo bar",
                 expected_logs=[
                     "The command 'foo' was not found in the prime directory, but found 'bar/foo'.",
-                    "The command 'foo bar' has been rewritten to 'bar/foo bar'.",
+                    "The command 'foo bar' has been changed to 'bar/foo bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -176,7 +176,7 @@ class TestCommandMangle:
                 expected_command="bar/sh bar",
                 expected_logs=[
                     "The command 'sh' was not found in the prime directory, but found 'bar/sh'.",
-                    "The command 'sh bar' has been rewritten to 'bar/sh bar'.",
+                    "The command 'sh bar' has been changed to 'bar/sh bar'.",
                 ],
                 shebang="",
                 interpreter_path=None,
@@ -189,7 +189,7 @@ class TestCommandMangle:
                 command_value="foo bar",
                 expected_command="bin/python $SNAP/foo bar",
                 expected_logs=[
-                    "The command 'foo bar' has been rewritten to 'bin/python $SNAP/foo bar' to safely account for the interpreter.",
+                    "The command 'foo bar' has been changed to 'bin/python $SNAP/foo bar' to safely account for the interpreter.",
                 ],
                 shebang="#!/usr/bin/env $SNAP/bin/python",
                 interpreter_path="bin/python",
@@ -214,7 +214,7 @@ class TestCommandMangle:
                 expected_command="bin/python $SNAP/bin/foo bar",
                 expected_logs=[
                     "The interpreter 'python' for 'bin/foo' was resolved to 'bin/python'.",
-                    "The command 'bin/foo bar' has been rewritten to 'bin/python $SNAP/bin/foo bar' to safely account for the interpreter.",
+                    "The command 'bin/foo bar' has been changed to 'bin/python $SNAP/bin/foo bar' to safely account for the interpreter.",
                 ],
                 shebang="#!/usr/bin/env python",
                 interpreter_path="bin/python",
@@ -229,7 +229,7 @@ class TestCommandMangle:
                 expected_logs=[
                     "The interpreter 'python' for 'bin/foo' was resolved to 'bin/python'.",
                     "Found unneeded '$SNAP/' in command '$SNAP/bin/foo bar'.",
-                    "The command '$SNAP/bin/foo bar' has been rewritten to 'bin/python $SNAP/bin/foo bar' to safely account for the interpreter.",
+                    "The command '$SNAP/bin/foo bar' has been changed to 'bin/python $SNAP/bin/foo bar' to safely account for the interpreter.",
                 ],
                 shebang="#!/usr/bin/env python",
                 interpreter_path="bin/python",

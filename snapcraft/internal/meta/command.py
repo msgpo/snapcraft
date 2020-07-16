@@ -216,11 +216,11 @@ def _massage_command(*, command: str, prime_dir: str) -> str:
 
         if interpreted_command:
             logger.warning(
-                f"The command {command!r} has been rewritten to {massaged_command!r} to safely account for the interpreter."
+                f"The command {command!r} has been changed to {massaged_command!r} to safely account for the interpreter."
             )
         else:
             logger.warning(
-                f"The command {command!r} has been rewritten to {massaged_command!r}."
+                f"The command {command!r} has been changed to {massaged_command!r}."
             )
 
     return massaged_command
