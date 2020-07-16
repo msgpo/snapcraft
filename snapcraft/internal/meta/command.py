@@ -14,13 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import contextlib
 import logging
 import os
 import re
 import shlex
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from . import errors
 from ._utils import _executable_is_valid
@@ -29,11 +28,6 @@ from snapcraft.internal import common
 
 logger = logging.getLogger(__name__)
 _COMMAND_PATTERN = re.compile("^[A-Za-z0-9. _#:$-][A-Za-z0-9/. _#:$-]*$")
-_FMT_COMMAND_SNAP_STRIP = "Stripped '$SNAP/' from command {!r}."
-_FMT_COMMAND_ROOT = (
-    "The command {!r} was not found in the prime directory, it has been "
-    "changed to {!r}."
-)
 _FMT_SNAPD_WRAPPER = (
     "A shell wrapper will be generated for command {!r} as it does not conform "
     "with the command pattern expected by the runtime. "
@@ -43,62 +37,134 @@ _FMT_SNAPD_WRAPPER = (
 )
 
 
-def _get_shebang_from_file(file_path: str) -> List[str]:
+def _get_shebang_from_file(file_path: str) -> Optional[str]:
     """Returns the shebang from file_path."""
-    if not os.path.exists(file_path):
-        raise errors.ShebangNotFoundError()
-
     with open(file_path, "rb") as exefile:
         if exefile.read(2) != b"#!":
-            raise errors.ShebangNotFoundError()
+            return None
         shebang_line = exefile.readline().strip().decode("utf-8")
 
-    # posix is set to False to respect the quoting of variables.
-    shebang_parts = shlex.split(shebang_line, posix=False)
-    # remove the leading /usr/bin/env.
-    if shebang_parts[0] == "/usr/bin/env":
-        shebang_parts = shebang_parts[1:]
-    # or if the shebang startswith /.
-    elif shebang_parts[0].startswith("/"):
-        raise errors.ShebangInRoot()
-
-    return shebang_parts
+    return shebang_line
 
 
-def _find_executable(*, binary: str, prime_dir: str) -> str:
-    found_path: Optional[str] = None
+def _find_executable(*, command: str, prime_dir: str) -> Optional[str]:
     binary_paths = (
-        os.path.join(p, binary) for p in common.get_bin_paths(root=prime_dir)
+        os.path.join(p, command) for p in common.get_bin_paths(root=prime_dir)
     )
     for binary_path in binary_paths:
         if _executable_is_valid(binary_path):
-            found_path = binary_path
-            break
+            return binary_path
     else:
         # Last chance to find in the prime_dir, mostly for backwards compatibility,
         # to find the executable, historical snaps like those built with the catkin
         # plugin will have roslaunch in a path like /opt/ros/bin/roslaunch.
         for root, _, files in os.walk(prime_dir):
-            if _executable_is_valid(os.path.join(root, binary)):
-                found_path = os.path.join(root, binary)
-                break
+            if _executable_is_valid(os.path.join(root, command)):
+                return os.path.join(root, command)
+
+    # Finally, check if it is part of the system.
+    return shutil.which(command)
+
+
+def _resolve_snap_command_path(
+    *, command: str, prime_dir: str
+) -> Tuple[Optional[str], bool]:
+    search_required = False
+    command = _strip_command_leaders(command)
+
+    # If it is where it claims to be, search for backwards compatibility.
+    if not os.path.exists(os.path.join(prime_dir, command)):
+        search_required = True
+
+        found_command = _find_executable(command=command, prime_dir=prime_dir)
+        if found_command is None:
+            return found_command, search_required
+
+        if found_command.startswith(prime_dir):
+            command = os.path.relpath(found_command, prime_dir)
         else:
-            # Finally, check if it is part of the system.
-            found_path = shutil.which(binary)
+            command = found_command
 
-    if found_path is None:
-        raise errors.PrimedCommandNotFoundError(binary)
-
-    return found_path
+    return command, search_required
 
 
-def _get_command_path(*, command: str, prime_dir: str) -> str:
+def _strip_command_leaders(command: str) -> str:
     # Strip leading "/"
     command = re.sub(r"^/", "", command)
+
     # Strip leading "$SNAP/"
     command = re.sub(r"^\$SNAP/", "", command)
 
-    return os.path.join(prime_dir, command)
+    return command
+
+
+def _split_command(*, command: str, prime_dir: str) -> Tuple[List[str], List[str]]:
+    """Parse command, returning (interpreter, command)."""
+
+    # posix is set to False to respect the quoting of variables.
+    command_parts = shlex.split(command, posix=False)
+    command_path = os.path.join(prime_dir, _strip_command_leaders(command_parts[0]))
+
+    shebang_parts: List[str] = list()
+    if os.path.exists(command_path):
+        shebang = _get_shebang_from_file(command_path)
+        if shebang:
+            shebang_parts = shlex.split(shebang, posix=False)
+
+    return shebang_parts, command_parts
+
+
+def _resolve_interpreter_parts(
+    *, shebang_parts: List[str], command_parts: List[str], prime_dir: str
+) -> List[str]:
+    # Remove the leading /usr/bin/env and resolve it now.
+    resolved_parts = shebang_parts.copy()
+    if resolved_parts[0] == "/usr/bin/env":
+        resolved_parts = resolved_parts[1:]
+
+    resolved_interpreter, search_required = _resolve_snap_command_path(
+        command=resolved_parts[0], prime_dir=prime_dir
+    )
+
+    if resolved_interpreter is None:
+        # Note this is not a hard error, just warn.
+        logger.warning("Unable to find interpreter in any paths: {resolved_parts[0]!r}")
+    elif search_required:
+        logger.warning(
+            f"The interpreter {resolved_parts[0]!r} for {command_parts[0]!r} was resolved to {resolved_interpreter!r}."
+        )
+
+    if resolved_interpreter is not None:
+        resolved_parts[0] = resolved_interpreter
+
+    return resolved_parts
+
+
+def _resolve_command_parts(
+    *, command_parts: List[str], interpreted_command: bool, prime_dir: str
+) -> List[str]:
+    resolved_parts = command_parts.copy()
+    resolved_command, search_required = _resolve_snap_command_path(
+        command=resolved_parts[0], prime_dir=prime_dir
+    )
+
+    if resolved_command is None:
+        raise errors.PrimedCommandNotFoundError(resolved_parts[0])
+    elif search_required:
+        logger.warning(
+            f"The command {resolved_parts[0]!r} was not found in the prime directory, but found {resolved_command!r}."
+        )
+
+    # Prepend $SNAP now required for resolved command.
+    if (
+        interpreted_command
+        and resolved_command
+        and not resolved_command.startswith("/")
+    ):
+        resolved_command = os.path.join("$SNAP", resolved_command)
+
+    resolved_parts[0] = resolved_command
+    return resolved_parts
 
 
 def _massage_command(*, command: str, prime_dir: str) -> str:
@@ -118,55 +184,46 @@ def _massage_command(*, command: str, prime_dir: str) -> str:
     if command.startswith("/"):
         return command
 
-    # command_parts holds the lexical split of a command entry.
-    # posix is set to False to respect the quoting of variables.
-    command_parts = shlex.split(command, posix=False)
-    # Make a note now that $SNAP if found this path will not make it into the
-    # resulting command entry.
-    if command_parts[0].startswith("$SNAP/"):
-        logger.warning(_FMT_COMMAND_SNAP_STRIP.format(command))
-    # command_path is the absolute path to the real command (command_parts[0]),
-    # used to verify that the executable is valid and potentially extract a
-    # shebang.
-    command_path = _get_command_path(command=command_parts[0], prime_dir=prime_dir)
+    massaged_command = re.sub(r"^\$SNAP/", "", command)
+    shebang_parts, command_parts = _split_command(
+        command=massaged_command, prime_dir=prime_dir
+    )
 
-    # Extract shebang, if the shebang is not root bound it will be inserted at the
-    # beginning of command_parts. If the shebang is not found we will ignore it
-    # for backwards compatibility (this might be part of a content interfaced
-    # snap).
-    # If a shebang is found, command_path is rewritten to point to the shebang.
-    with contextlib.suppress(errors.ShebangNotFoundError, errors.ShebangInRoot):
-        shebang_parts = _get_shebang_from_file(command_path)
-        # Add the shebang (interpreter) to the front of the command.
-        command_parts = shebang_parts + command_parts
-        # And make sure the original command is prepended with $SNAP so it is
-        # found and not already set.
-        if not command_parts[1].startswith("$SNAP"):
-            command_parts[1] = os.path.join("$SNAP", command_parts[1])
-        command_path = _get_command_path(command=shebang_parts[0], prime_dir=prime_dir)
-
-    # If the command is part of the snap (starts with $SNAP) it NEEDS to exist
-    # within the prime directory.
-    if not os.path.exists(command_path) and command_parts[0].startswith("$SNAP/"):
-        raise errors.PrimedCommandNotFoundError(command_parts[0])
-    # if the command is "pathless", make an attempt to find the executable within
-    # the prime directory and as a last resort (for backwards compatibility),
-    # at the root of the filesystem.
-    elif not os.path.exists(command_path):
-        command_path = _find_executable(binary=command_parts[0], prime_dir=prime_dir)
-
-    # A command found within the prime directory will have a command_path that
-    # starts with the prime directory leading the path. Make it relative to
-    # this prime directory before replacing the original command.
-    if command_path.startswith(prime_dir):
-        command_parts[0] = os.path.relpath(command_path, prime_dir)
-    # If not in the prime directory, add as is as it is pointing to the root
-    # (most likely part of the base for this snap).
+    if shebang_parts:
+        interpreted_command = True
+        shebang_parts = _resolve_interpreter_parts(
+            shebang_parts=shebang_parts,
+            command_parts=command_parts,
+            prime_dir=prime_dir,
+        )
     else:
-        logger.warning(_FMT_COMMAND_ROOT.format(command, command_path))
-        command_parts[0] = command_path
+        interpreted_command = False
 
-    return " ".join(command_parts)
+    command_parts = _resolve_command_parts(
+        command_parts=command_parts,
+        interpreted_command=interpreted_command,
+        prime_dir=prime_dir,
+    )
+
+    massaged_command = " ".join(shebang_parts + command_parts)
+
+    # Inform the user of any changes.
+    if massaged_command != command:
+        # Make a note now that $SNAP if found this path will not make it into the
+        # resulting command entry.
+        if command.startswith("$SNAP/"):
+            logger.warning(f"Found unneeded '$SNAP/' in command {command!r}.")
+
+        if interpreted_command:
+            logger.warning(
+                f"The command {command!r} has been rewritten to {massaged_command!r} to safely account for the interpreter."
+            )
+        else:
+            logger.warning(
+                f"The command {command!r} has been changed to {massaged_command!r}."
+            )
+
+    return massaged_command
 
 
 class Command:
@@ -204,7 +261,7 @@ class Command:
         )
 
     def prime_command(
-        self, *, can_use_wrapper: bool, massage_command: bool = True, prime_dir: str
+        self, *, can_use_wrapper: bool, massage_command: bool = True, prime_dir: str,
     ) -> str:
         """Finalize and prime command, massaging as necessary.
 
